@@ -1,0 +1,56 @@
+Bosch Control (Nefit Easy and likely Worcester Wave, Junkers Control)
+=====================================================================
+This is the c code to connect to a touchscreen thermostat from Bosch
+with wifi access (rebranded depending on supplier it seems, see title,
+tested with a Nefit Easy). The thermostat connects to a Bosch server by
+xmpp, see https://xmpp.org. Clients like smartphones etc, can connect to the
+same server and can request the server to forward HTTP request / commands
+to the thermostat on their behalf.
+
+This code does the same, but as a command line binary, only fetching
+values at the moment.
+
+Building
+--------
+The build depends on
+  - json-c
+  - openssl
+  - libstrophe (http://strophe.im/libstrophe/)
+
+The first two are available from the package manager at least on Ubuntu
+(the *-dev packages need to be installed). The last one is on github,
+https://github.com/strophe/libstrophe.
+
+The nefit-easy.pro can be opened by qtcreator (not that qt is used, but it
+is a nice IDE available on linux). After selecting a target the following
+environmental variables must be added to project -> run -> run enviroment ->
+details -> Batch Edit
+
+NEFIT_SERIAL_NUMBER=123456789
+NEFIT_ACCESS_KEY=abcdefhijklmnopq
+NEFIT_PASSWORD=wachtw
+
+(they are printing on the front of the manual, the password might be written
+on it as well). After this pressing debug should give json output in the
+Application Output Window.
+
+
+To build from a command line use:
+
+qmake ./nefit-easy.pro
+make
+
+export above mentioned variables and start the application (./netfit-easy).
+
+Supported platforms
+-------------------
+Linux is only tested at the moment...
+
+Other implementations
+---------------------
+(from which the authentication / decryption is copied):
+javascript: https://github.com/robertklep/nefit-easy-core
+python: https://github.com/robintw/pywavethermo
+
+php and c# are floating on the web, at least in binary form, see
+http://gathering.tweakers.net/forum/list_messages/1659309/0 (Dutch)
