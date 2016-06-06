@@ -272,6 +272,9 @@ int easy_connect(struct nefit_easy *easy, char const *serial, char const *access
 	easy->xmpp_conn = xmpp_conn_new(easy->xmpp_ctx);
 	easy->cb = cb;
 
+	if (xmpp_conn_set_flags(easy->xmpp_conn, XMPP_CONN_FLAG_MANDATORY_TLS) != 0)
+		return -1;
+
 	/* setup authentication information */
 	asprintf(&jid, "rrccontact_%s@%s", serial, host);
 	asprintf(&easy->gateway, "rrcgateway_%s@%s", serial, host);
