@@ -138,8 +138,6 @@ static int easy_get_it(struct nefit_easy *easy)
 
 	data = xmpp_stanza_new(ctx);
 	xmpp_stanza_set_text(data, req->http_req);
-	printf("\n%s\n", req->description);
-	printf("-------------------------------------------------------------------\n");
 	xmpp_stanza_add_child(body, data);
 	xmpp_stanza_release(data);
 
@@ -192,9 +190,6 @@ int easy_get(struct nefit_easy *easy, char const *url)
 		"GET %s HTTP/1.0\r\n" \
 		"User-Agent: NefitEasy\r\n" \
 		"\r\n", url) < 0)
-		goto error;
-
-	if (asprintf(&req->description, "get %s", url) < 0)
 		goto error;
 
 	if (!req->http_req)

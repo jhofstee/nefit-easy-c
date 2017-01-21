@@ -16,7 +16,6 @@ typedef void (netif_easy_callback)(struct nefit_easy *easy, json_object *new_obj
 struct request {
 	STAILQ_ENTRY(request) next;
 	char *http_req;					/* HTTP request to send to the thermostat */
-	char *description;				/* for debugging */
 };
 
 struct nefit_easy
