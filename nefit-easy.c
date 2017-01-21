@@ -73,7 +73,7 @@ static int get_request_hander(xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *us
 	xmpp_stanza_t *body;
 	char *intext;
 	char *content = NULL, *decoded = NULL;
-	unsigned char *rawEncoded;
+	unsigned char *rawEncoded = NULL;
 	size_t raw_encoded_len;
 	json_object *new_obj;
 	EASY_UNUSED(conn);
@@ -90,6 +90,8 @@ static int get_request_hander(xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *us
 
 	xmpp_base64_decode_bin(ctx, &content[2], strlen(&content[2]), &rawEncoded,
 						   &raw_encoded_len);
+	if (rawEncoded == NULL)
+		goto out;
 	decoded = (char *) malloc(raw_encoded_len);
 	if (decoded == NULL)
 		goto out;
@@ -98,9 +100,12 @@ static int get_request_hander(xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *us
 	new_obj = json_tokener_parse(decoded);
 	if (easy->cb)
 		easy->cb(easy, new_obj);
+	json_object_put(new_obj);
 
 out:
+	free(decoded);
 	xmpp_free(ctx, intext);
+	xmpp_free(ctx, rawEncoded);
 	request_done(easy);
 
 	return 1;
@@ -177,9 +182,11 @@ static void request_done(struct nefit_easy *easy)
  */
 int easy_get(struct nefit_easy *easy, char const *url)
 {
-	struct request *req	= calloc(1, sizeof(struct request));
+	struct request *req;
+
+	req = calloc(1, sizeof(struct request));
 	if (!req)
-		goto error;
+		return -1;
 
 	if (asprintf(&req->http_req,
 		"GET %s HTTP/1.0\r\n" \
