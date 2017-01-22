@@ -34,5 +34,8 @@ struct nefit_easy
 int easy_connect(struct nefit_easy *easy, const char *serial, char const *access_key,
 				 char const *password, netif_easy_callback *cb);
 int easy_get(struct nefit_easy *easy, char const *url);
+int easy_put_object(struct nefit_easy *easy, char const *url, json_object *obj);
+int easy_put_double(struct nefit_easy *easy, char const *url, double value);
+int easy_put_string(struct nefit_easy *easy, char const *url, char const *value);
 
 #endif

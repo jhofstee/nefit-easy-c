@@ -54,6 +54,44 @@ static void decrypt(struct nefit_easy *easy, unsigned char const *encrypted,
 }
 
 /*
+ * Encrypts the payload (HTTP response).
+ * This depends on the password of the user.
+ *
+ * @note the return value must be freed
+*/
+static unsigned char *encrypt(struct nefit_easy *easy, unsigned char const *plaintext,
+							  size_t len, size_t *encrypted_len)
+{
+	unsigned char *padded, *encrypted;
+	size_t c = 0, padding;
+
+	padding = (16 - (len % 16)) % 16;
+	*encrypted_len = len + padding;
+	padded = malloc(*encrypted_len);
+	if (padded == NULL)
+		return NULL;
+
+	encrypted = malloc(*encrypted_len);
+	if (encrypted == NULL) {
+		free(padded);
+		return NULL;
+	}
+
+	memcpy(padded, plaintext, len);
+	memset(&padded[len], 0, padding);
+
+	while (c < *encrypted_len)
+	{
+		AES_ecb_encrypt(&padded[c], &encrypted[c], &easy->aesKeyEnc, AES_ENCRYPT);
+		c += 16;
+	}
+
+	free(padded);
+
+	return encrypted;
+}
+
+/*
  * Initializes the encryption for payload (HTTP request / response).
  * This depends on the password of the user.
  */
@@ -76,6 +114,7 @@ static int get_request_hander(xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *us
 	unsigned char *rawEncoded = NULL;
 	size_t raw_encoded_len;
 	json_object *new_obj;
+	int http_code;
 	EASY_UNUSED(conn);
 
 	body = xmpp_stanza_get_child_by_name(stanza, "body");
@@ -83,6 +122,9 @@ static int get_request_hander(xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *us
 		return 1;
 
 	intext = xmpp_stanza_get_text(body);
+	if (sscanf(intext, "HTTP/1.0 %d", &http_code) != 1)
+		goto out;
+
 	content = strstr(intext, "\n\n");
 
 	if (content == NULL)
@@ -205,6 +247,95 @@ error:
 	free(req);
 	return -1;
 }
+
+/**
+ * @brief Queues a put. When idle the command is send immediately.
+ * @param easy The easy to queue the request for
+ * @param url The url to put
+ * @return 0 when successful
+ */
+int easy_put_object(struct nefit_easy *easy, char const *url, struct json_object *obj)
+{
+	struct request *req;
+	char const *json_txt;
+	unsigned char *encrypted;
+	size_t encrypted_len;
+	char *payload;
+
+	req = calloc(1, sizeof(struct request));
+	if (!req)
+		return -1;
+
+	json_txt = json_object_to_json_string(obj);
+	if (!json_txt)
+		goto error;
+
+	/*
+	 * First encrypt the json string, it can be slightly longer, encrypted_len
+	 * contains the actual length.
+	 */
+	encrypted = encrypt(easy, (unsigned char const *) json_txt, strlen(json_txt), &encrypted_len);
+	if (encrypted == NULL)
+		goto error;
+
+	payload = xmpp_base64_encode(easy->xmpp_ctx, encrypted, encrypted_len);
+	free(encrypted);
+
+	if (asprintf(&req->http_req,
+		"PUT %s HTTP/1.0\n" \
+		"Content-Type: application/json\n" \
+		"Content-Length: %d\n" \
+		"User-Agent: NefitEasy\n" \
+		"\n\n\n" \
+		"%s", url, (int) strlen(payload), payload) < 0)
+		goto error;
+
+	if (!req->http_req)
+		goto error;
+
+	STAILQ_INSERT_TAIL(&easy->requests, req, next);
+	check_pending_work(easy);
+
+	return 0;
+
+error:
+	free(req->http_req);
+	free(req);
+	return -1;
+}
+
+int easy_put_double(struct nefit_easy *easy, char const *url, double value)
+{
+	struct json_object *obj;
+	int ret;
+
+	obj = json_object_new_object();
+	if (obj == NULL)
+		return -1;
+
+	json_object_object_add(obj, "value", json_object_new_double(value));
+	ret = easy_put_object(easy, url, obj);
+	json_object_put(obj);
+
+	return ret;
+}
+
+int easy_put_string(struct nefit_easy *easy, char const *url, char const *value)
+{
+	struct json_object *obj;
+	int ret;
+
+	obj = json_object_new_object();
+	if (obj == NULL)
+		return -1;
+
+	json_object_object_add(obj, "value", json_object_new_string(value));
+	ret = easy_put_object(easy, url, obj);
+	json_object_put(obj);
+
+	return ret;
+}
+
 
 /* ping_handler, answers remote ping request to keep the connection alive */
 static int ping_handler(xmpp_conn_t *conn, xmpp_stanza_t *stanza, void *userdata)
