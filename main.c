@@ -78,7 +78,9 @@ const char *paths[] = {
 	"/heatingCircuits/hc1/holidayMode/temperature",
 	"/heatingCircuits/hc1/operationMode",
 	"/heatingCircuits/hc1/temperatureAdjustment",
+	"/heatingCircuits/hc1/manualTempOverride/status",
 	"/heatingCircuits/hc1/type",
+	"/heatingCircuits/hc1/usermode",
 	"/notifications",
 	"/system/appliance/boilermaintenancerequest",
 	"/system/appliance/causecode",
@@ -101,11 +103,32 @@ static void value_obtained(struct nefit_easy *easy, json_object *obj)
 	fflush(stdout);
 }
 
+/* Request all values from the array above */
+void get_values(struct nefit_easy *easy)
+{
+	char const **path;
+
+	path = paths;
+	while (*path != NULL)
+		easy_get(easy, *path++);
+}
+
+/* Force a certain temperature */
+void manual_temperature(struct nefit_easy *easy, double temperature)
+{
+	easy_put_double(easy, "/heatingCircuits/hc1/temperatureRoomManual", temperature);
+	easy_put_string(easy, "/heatingCircuits/hc1/usermode", "manual");
+}
+
+/* Stop forcing a temperature and resume normal program */
+void clock_mode(struct nefit_easy *easy)
+{
+	easy_put_string(easy, "/heatingCircuits/hc1/usermode", "clock");
+}
 
 int main(int argc, char **argv)
 {
 	struct nefit_easy easy;
-	char const **path;
 	char *serial_number, *access_key, *password;
 	EASY_UNUSED(argc);
 	EASY_UNUSED(argv);
@@ -127,9 +150,9 @@ int main(int argc, char **argv)
 
 	easy_connect(&easy, serial_number, access_key, password, value_obtained);
 
-	path = paths;
-	while (*path != NULL)
-		easy_get(&easy, *path++);
+	get_values(&easy);
+	//manual_temperature(&easy, 23);
+	//clock_mode(&easy);
 
 	/* enter the event loop */
 	xmpp_run(easy.xmpp_ctx);
